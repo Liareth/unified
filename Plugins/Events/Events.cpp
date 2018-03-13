@@ -49,6 +49,7 @@ Events::Events(const Plugin::CreateParams& params)
     GetServices()->m_events->RegisterEvent("PUSH_EVENT_DATA", std::bind(&Events::OnPushEventData, this, std::placeholders::_1));
     GetServices()->m_events->RegisterEvent("SIGNAL_EVENT", std::bind(&Events::OnSignalEvent, this, std::placeholders::_1));
     GetServices()->m_events->RegisterEvent("GET_EVENT_DATA", std::bind(&Events::OnGetEventData, this, std::placeholders::_1));
+    GetServices()->m_events->RegisterEvent("SKIP_EVENT", std::bind(&Events::OnSkipEvent, this, std::placeholders::_1));
 
     GetServices()->m_messaging->SubscribeMessage("NWNX_EVENT_SIGNAL_EVENT",
         [](const std::vector<std::string> message)
@@ -127,14 +128,18 @@ void Events::PushEventData(const std::string tag, const std::string data)
 
 bool Events::SignalEvent(const std::string& eventName, const API::Types::ObjectID target)
 {
+    bool skipped = false;
+
     const auto& scripts = g_plugin->m_eventMap[eventName];
 
     for (const auto& script : scripts)
     {
         LOG_DEBUG("Dispatching notification for event '%s' to script '%s'.", eventName.c_str(), script.c_str());
         API::CExoString scriptExoStr = script.c_str();
+
         ++g_plugin->m_eventDepth;
         API::Globals::VirtualMachine()->RunScript(&scriptExoStr, target, 1);
+        skipped |= m_eventData.top().m_Skipped;
         --g_plugin->m_eventDepth;
     }
 
@@ -143,7 +148,7 @@ bool Events::SignalEvent(const std::string& eventName, const API::Types::ObjectI
         g_plugin->m_eventData.pop();
     }
 
-    return !scripts.empty();
+    return !skipped;
 }
 
 Services::Events::ArgumentStack Events::OnSubscribeEvent(Services::Events::ArgumentStack&& args)
@@ -184,12 +189,12 @@ Services::Events::ArgumentStack Events::OnSignalEvent(Services::Events::Argument
 
 Services::Events::ArgumentStack Events::OnGetEventData(Services::Events::ArgumentStack&& args)
 {
-    if (m_eventDepth == 0 || m_eventData.size() == 0)
+    if (m_eventDepth == 0 || m_eventData.m_EventData.size() == 0)
     {
         throw std::runtime_error("Attempted to access invalid event data or in an invalid context.");
     }
 
-    auto& eventData = m_eventData.top();
+    auto& eventData = m_eventData.top().m_EventData;
     auto data = eventData.find(Services::Events::ExtractArgument<std::string>(args));
 
     if (data == std::end(eventData))
@@ -200,6 +205,17 @@ Services::Events::ArgumentStack Events::OnGetEventData(Services::Events::Argumen
     Services::Events::ArgumentStack stack;
     Services::Events::InsertArgument(stack, data->second);
     return stack;
+}
+
+Services::Events::ArgumentStack Events::OnSkipEvent(Services::Events::ArgumentStack&& args)
+{
+    if (m_eventDepth == 0 || m_eventData.m_EventData.size() == 0)
+    {
+        throw std::runtime_error("Attempted to skip event in an invalid context.");
+    }
+
+    m_eventData.top().m_Skipped = true;
+    return Services::Events::ArgumentStack();
 }
 
 }

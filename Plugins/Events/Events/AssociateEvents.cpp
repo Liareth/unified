@@ -8,27 +8,44 @@ namespace Events {
 
 using namespace NWNXLib;
 
+static Hooking::FunctionHook* g_AddAssociateHook = nullptr;
+static Hooking::FunctionHook* g_RemoveAssociateHook = nullptr;
+
 AssociateEvents::AssociateEvents(ViewPtr<Services::HooksProxy> hooker)
 {
-    hooker->RequestSharedHook<API::Functions::CNWSCreature__AddAssociate, void,
-        API::CNWSCreature*, API::Types::ObjectID, uint16_t>(&AddAssociateHook);
+    hooker->RequestExclusiveHook<API::Functions::CNWSCreature__AddAssociate, void, API::CNWSCreature*, API::Types::ObjectID, uint16_t>(&AddAssociateHook);
+    hooker->RequestExclusiveHook<API::Functions::CNWSCreature__RemoveAssociate, void, API::CNWSCreature*, API::Types::ObjectID>(&RemoveAssociateHook);
 
-    hooker->RequestSharedHook<API::Functions::CNWSCreature__RemoveAssociate, void,
-        API::CNWSCreature*, API::Types::ObjectID>(&RemoveAssociateHook);
+    g_AddAssociateHook = m_services->m_hooks->FindHookByAddress(API::Functions::CNWSCreature__AddAssociate);
+    g_RemoveAssociateHook = m_services->m_hooks>FindHookByAddress(API::Functions::CNWSCreature__RemoveAssociate);
 }
 
-void AssociateEvents::AddAssociateHook(Services::Hooks::CallType type, API::CNWSCreature* thisPtr, API::Types::ObjectID assocId, uint16_t)
+void AssociateEvents::AddAssociateHook(API::CNWSCreature* thisPtr, API::Types::ObjectID assocId, uint16_t unused)
 {
-    const bool before = type == Services::Hooks::CallType::BEFORE_ORIGINAL;
-    Events::PushEventData("ASSOCIATE_OBJECT_ID", Helpers::ObjectIDToString(assocId));
-    Events::SignalEvent(before ? "NWNX_ON_ADD_ASSOCIATE_BEFORE" : "NWNX_ON_ADD_ASSOCIATE_AFTER", thisPtr->m_idSelf);
+    std::string assocId = Helpers::ObjectIDToString(assocId);
+
+    Events::PushEventData("ASSOCIATE_OBJECT_ID", assocId);
+    if (Events::SignalEvent("NWNX_ON_ADD_ASSOCIATE_BEFORE", thisPtr->m_idSelf))
+    {
+        g_AddAssociateHook->CallOriginal<void>(thisPtr, assocId, unused);
+    }
+
+    Events::PushEventData("ASSOCIATE_OBJECT_ID", assocId);
+    Events::SignalEvent("NWNX_ON_ADD_ASSOCIATE_AFTER", thisPtr->m_idSelf);
 }
 
-void AssociateEvents::RemoveAssociateHook(Services::Hooks::CallType type, API::CNWSCreature* thisPtr, API::Types::ObjectID assocId)
+void AssociateEvents::RemoveAssociateHook(API::CNWSCreature* thisPtr, API::Types::ObjectID assocId)
 {
-    const bool before = type == Services::Hooks::CallType::BEFORE_ORIGINAL;
-    Events::PushEventData("ASSOCIATE_OBJECT_ID", Helpers::ObjectIDToString(assocId));
-    Events::SignalEvent(before ? "NWNX_ON_REMOVE_ASSOCIATE_BEFORE" : "NWNX_ON_REMOVE_ASSOCIATE_AFTER", thisPtr->m_idSelf);
+    std::string assocId = Helpers::ObjectIDToString(assocId);
+
+    Events::PushEventData("ASSOCIATE_OBJECT_ID", assocId);
+    if (Events::SignalEvent("NWNX_ON_REMOVE_ASSOCIATE_BEFORE", thisPtr->m_idSelf))
+    {
+        g_RemoveAssociateHook->CallOriginal<void>(thisPtr, assocId);
+    }
+
+    Events::PushEventData("ASSOCIATE_OBJECT_ID", assocId);
+    Events::SignalEvent("NWNX_ON_REMOVE_ASSOCIATE_AFTER", thisPtr->m_idSelf);
 }
 
 }
