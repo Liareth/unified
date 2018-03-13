@@ -25,6 +25,9 @@ class Events : public NWNXLib::Plugin
 public: // Structures
     struct EventParams
     {
+        // The name of the event
+        std::string m_EventName;
+
         // This maps between event data key -> event data value.
         std::unordered_map<std::string, std::string> m_EventData;
 

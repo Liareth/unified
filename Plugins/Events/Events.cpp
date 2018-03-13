@@ -117,13 +117,8 @@ Events::~Events()
 
 void Events::PushEventData(const std::string tag, const std::string data)
 {
-    if (g_plugin->m_eventData.size() <= g_plugin->m_eventDepth)
-    {
-        g_plugin->m_eventData.push(std::unordered_map<std::string, std::string>());
-    }
-
     LOG_DEBUG("Pushing event data: '%s' -> '%s'.", tag.c_str(), data.c_str());
-    g_plugin->m_eventData.top()[tag] = std::move(data);
+    g_plugin->m_eventData.top().m_EventData[tag] = std::move(data);
 }
 
 bool Events::SignalEvent(const std::string& eventName, const API::Types::ObjectID target)
@@ -134,17 +129,19 @@ bool Events::SignalEvent(const std::string& eventName, const API::Types::ObjectI
 
     for (const auto& script : scripts)
     {
+        EventParams params;
+        params.m_EventName = eventName;
+        params.m_Skipped = false;
+        g_plugin->m_eventData.push(std::move(params));
+        ++g_plugin->m_eventDepth;
+
         LOG_DEBUG("Dispatching notification for event '%s' to script '%s'.", eventName.c_str(), script.c_str());
         API::CExoString scriptExoStr = script.c_str();
-
-        ++g_plugin->m_eventDepth;
         API::Globals::VirtualMachine()->RunScript(&scriptExoStr, target, 1);
-        skipped |= m_eventData.top().m_Skipped;
-        --g_plugin->m_eventDepth;
-    }
 
-    if (g_plugin->m_eventData.size() > g_plugin->m_eventDepth)
-    {
+        skipped |= m_eventData.top().m_Skipped;
+
+        --g_plugin->m_eventDepth;
         g_plugin->m_eventData.pop();
     }
 
@@ -189,7 +186,7 @@ Services::Events::ArgumentStack Events::OnSignalEvent(Services::Events::Argument
 
 Services::Events::ArgumentStack Events::OnGetEventData(Services::Events::ArgumentStack&& args)
 {
-    if (m_eventDepth == 0 || m_eventData.m_EventData.size() == 0)
+    if (m_eventDepth == 0 || m_eventData.top().m_EventData.size() == 0)
     {
         throw std::runtime_error("Attempted to access invalid event data or in an invalid context.");
     }
@@ -212,6 +209,13 @@ Services::Events::ArgumentStack Events::OnSkipEvent(Services::Events::ArgumentSt
     if (m_eventDepth == 0)
     {
         throw std::runtime_error("Attempted to skip event in an invalid context.");
+    }
+
+    if (!m_eventData.top().m_Skipped)
+    {
+        // We're not already skipped - this is the first time. So dispatch a message for anyone
+        // who might care to hear that we're skipping.
+        messaging->BroadcastMessage("NWNX_EVENT_SKIPPED", { "NAME", m_eventData.top().m_EventName } );
     }
 
     m_eventData.top().m_Skipped = true;
