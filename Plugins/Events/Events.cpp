@@ -209,7 +209,7 @@ Services::Events::ArgumentStack Events::OnGetEventData(Services::Events::Argumen
 
 Services::Events::ArgumentStack Events::OnSkipEvent(Services::Events::ArgumentStack&& args)
 {
-    if (m_eventDepth == 0 || m_eventData.m_EventData.size() == 0)
+    if (m_eventDepth == 0)
     {
         throw std::runtime_error("Attempted to skip event in an invalid context.");
     }
