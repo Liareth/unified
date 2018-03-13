@@ -181,9 +181,9 @@ Services::Events::ArgumentStack Events::OnSignalEvent(Services::Events::Argument
 {
     const auto event = Services::Events::ExtractArgument<std::string>(args);
     const auto object = Services::Events::ExtractArgument<API::Types::ObjectID>(args);
-    bool signalled = SignalEvent(event, object);
+    bool proceed = SignalEvent(event, object);
     Services::Events::ArgumentStack stack;
-    Services::Events::InsertArgument(stack, signalled ? 1 : 0);
+    Services::Events::InsertArgument(stack, proceed ? 1 : 0);
     return stack;
 }
 

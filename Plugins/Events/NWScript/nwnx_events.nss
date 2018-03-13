@@ -34,7 +34,7 @@ void NWNX_Events_SubscribeEvent(string evt, string script);
 void NWNX_Events_PushEventData(string tag, string data);
 
 // Signals an event. This will dispatch a notification to all subscribed handlers.
-// Returns TRUE if anyone was subscribed to the event, FALSE otherwise.
+// Returns TRUE if the event can proceed, else FALSE if it has been skipped.
 int NWNX_Events_SignalEvent(string evt, object target);
 
 // Retrieves the event data for the currently executing script.
