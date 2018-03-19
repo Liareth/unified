@@ -139,7 +139,7 @@ bool Events::SignalEvent(const std::string& eventName, const API::Types::ObjectI
         API::CExoString scriptExoStr = script.c_str();
         API::Globals::VirtualMachine()->RunScript(&scriptExoStr, target, 1);
 
-        skipped |= m_eventData.top().m_Skipped;
+        skipped |= g_plugin->m_eventData.top().m_Skipped;
 
         --g_plugin->m_eventDepth;
         g_plugin->m_eventData.pop();
@@ -215,7 +215,7 @@ Services::Events::ArgumentStack Events::OnSkipEvent(Services::Events::ArgumentSt
     {
         // We're not already skipped - this is the first time. So dispatch a message for anyone
         // who might care to hear that we're skipping.
-        messaging->BroadcastMessage("NWNX_EVENT_SKIPPED", { "NAME", m_eventData.top().m_EventName } );
+        GetServices()->m_messaging->BroadcastMessage("NWNX_EVENTS_SKIPPED", { "NAME", m_eventData.top().m_EventName } );
     }
 
     m_eventData.top().m_Skipped = true;
