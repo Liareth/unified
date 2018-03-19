@@ -115,6 +115,25 @@ Events::~Events()
 {
 }
 
+
+void Events::StartEvent(const std::string& eventName)
+{
+    LOG_DEBUG("Starting event %s", eventName.c_str());
+    ASSERT(g_plugin->m_eventData.size() == g_plugin->m_eventDepth);
+
+    EventParams params;
+    params.m_EventName = eventName;
+    params.m_Skipped = false;
+    g_plugin->m_eventData.emplace(std::move(params));
+}
+
+void Events::EndEvent(const std::string& eventName)
+{
+    LOG_DEBUG("Ending event %s", eventName.c_str());
+    g_plugin->m_eventData.pop();
+    ASSERT(g_plugin->m_eventData.size() == g_plugin->m_eventDepth);
+}
+
 void Events::PushEventData(const std::string tag, const std::string data)
 {
     LOG_DEBUG("Pushing event data: '%s' -> '%s'.", tag.c_str(), data.c_str());
@@ -129,20 +148,16 @@ bool Events::SignalEvent(const std::string& eventName, const API::Types::ObjectI
 
     for (const auto& script : scripts)
     {
-        EventParams params;
-        params.m_EventName = eventName;
-        params.m_Skipped = false;
-        g_plugin->m_eventData.push(std::move(params));
         ++g_plugin->m_eventDepth;
 
         LOG_DEBUG("Dispatching notification for event '%s' to script '%s'.", eventName.c_str(), script.c_str());
         API::CExoString scriptExoStr = script.c_str();
         API::Globals::VirtualMachine()->RunScript(&scriptExoStr, target, 1);
 
+        ASSERT(g_plugin->m_eventData.size() == g_plugin->m_eventDepth);
         skipped |= g_plugin->m_eventData.top().m_Skipped;
 
         --g_plugin->m_eventDepth;
-        g_plugin->m_eventData.pop();
     }
 
     return !skipped;
@@ -204,7 +219,7 @@ Services::Events::ArgumentStack Events::OnGetEventData(Services::Events::Argumen
     return stack;
 }
 
-Services::Events::ArgumentStack Events::OnSkipEvent(Services::Events::ArgumentStack&& args)
+Services::Events::ArgumentStack Events::OnSkipEvent(Services::Events::ArgumentStack&&)
 {
     if (m_eventDepth == 0)
     {

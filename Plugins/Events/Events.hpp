@@ -39,6 +39,12 @@ public:
     Events(const Plugin::CreateParams& params);
     virtual ~Events();
 
+    // Should be called before any event data is pushed - prepare the event.
+    static void StartEvent(const std::string& eventName);
+
+    // Should be called at the very end of an event's execution.
+    static void EndEvent(const std::string& eventName);
+
     // Pushes event data to the stack - won't do anything until SignalEvent is called.
     static void PushEventData(const std::string tag, const std::string data);
 
