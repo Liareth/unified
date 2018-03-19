@@ -22,30 +22,38 @@ AssociateEvents::AssociateEvents(ViewPtr<Services::HooksProxy> hooker)
 
 void AssociateEvents::AddAssociateHook(API::CNWSCreature* thisPtr, API::Types::ObjectID assocId, uint16_t unused)
 {
-    std::string assocIdStr = Helpers::ObjectIDToString(assocId);
+    Events::StartEvent("NWNX_ON_ADD_ASSOCIATE_BEFORE");
+    Events::PushEventData("ASSOCIATE_OBJECT_ID", Helpers::ObjectIDToString(assocId));
+    bool proceed = Events::SignalEvent(thisPtr->m_idSelf);
+    Events::EndEvent();
 
-    Events::PushEventData("ASSOCIATE_OBJECT_ID", assocIdStr);
-    if (Events::SignalEvent("NWNX_ON_ADD_ASSOCIATE_BEFORE", thisPtr->m_idSelf))
+    if (proceed)
     {
-        g_AddAssociateHook->CallOriginal<void>(thisPtr, assocIdStr, unused);
+        g_AddAssociateHook->CallOriginal<void>(thisPtr, assocId, unused);
     }
 
-    Events::PushEventData("ASSOCIATE_OBJECT_ID", assocIdStr);
-    Events::SignalEvent("NWNX_ON_ADD_ASSOCIATE_AFTER", thisPtr->m_idSelf);
+    Events::StartEvent("NWNX_ON_ADD_ASSOCIATE_AFTER");
+    Events::PushEventData("ASSOCIATE_OBJECT_ID", Helpers::ObjectIDToString(assocId));
+    Events::SignalEvent(thisPtr->m_idSelf);
+    Events::EndEvent();
 }
 
 void AssociateEvents::RemoveAssociateHook(API::CNWSCreature* thisPtr, API::Types::ObjectID assocId)
 {
-    std::string assocIdStr = Helpers::ObjectIDToString(assocId);
+    Events::StartEvent("NWNX_ON_REMOVE_ASSOCIATE_BEFORE");
+    Events::PushEventData("ASSOCIATE_OBJECT_ID", Helpers::ObjectIDToString(assocId));
+    bool proceed = Events::SignalEvent(thisPtr->m_idSelf);
+    Events::EndEvent();
 
-    Events::PushEventData("ASSOCIATE_OBJECT_ID", assocIdStr);
-    if (Events::SignalEvent("NWNX_ON_REMOVE_ASSOCIATE_BEFORE", thisPtr->m_idSelf))
+    if (proceed)
     {
-        g_RemoveAssociateHook->CallOriginal<void>(thisPtr, assocIdStr);
+        g_RemoveAssociateHook->CallOriginal<void>(thisPtr, assocId);
     }
 
-    Events::PushEventData("ASSOCIATE_OBJECT_ID", assocIdStr);
-    Events::SignalEvent("NWNX_ON_REMOVE_ASSOCIATE_AFTER", thisPtr->m_idSelf);
+    Events::StartEvent("NWNX_ON_REMOVE_ASSOCIATE_BEFORE");
+    Events::PushEventData("ASSOCIATE_OBJECT_ID", Helpers::ObjectIDToString(assocId));
+    Events::SignalEvent(thisPtr->m_idSelf);
+    Events::EndEvent();
 }
 
 }

@@ -43,13 +43,13 @@ public:
     static void StartEvent(const std::string& eventName);
 
     // Should be called at the very end of an event's execution.
-    static void EndEvent(const std::string& eventName);
+    static void EndEvent();
 
     // Pushes event data to the stack - won't do anything until SignalEvent is called.
-    static void PushEventData(const std::string tag, const std::string data);
+    static void PushEventData(const std::string& tag, const std::string& data);
 
     // Returns true if the event can proceed, or false if the event has been skipped.
-    static bool SignalEvent(const std::string& eventName, const NWNXLib::API::Types::ObjectID target);
+    static bool SignalEvent(NWNXLib::API::Types::ObjectID target);
 
 private: // Structures
     using EventMapType = std::unordered_map<std::string, std::vector<std::string>>;

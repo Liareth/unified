@@ -127,23 +127,24 @@ void Events::StartEvent(const std::string& eventName)
     g_plugin->m_eventData.emplace(std::move(params));
 }
 
-void Events::EndEvent(const std::string& eventName)
+void Events::EndEvent()
 {
-    LOG_DEBUG("Ending event %s", eventName.c_str());
+    LOG_DEBUG("Ending event %s", g_plugin->m_eventData.top().m_EventName.c_str());
     g_plugin->m_eventData.pop();
     ASSERT(g_plugin->m_eventData.size() == g_plugin->m_eventDepth);
 }
 
-void Events::PushEventData(const std::string tag, const std::string data)
+void Events::PushEventData(const std::string& tag, const std::string& data)
 {
     LOG_DEBUG("Pushing event data: '%s' -> '%s'.", tag.c_str(), data.c_str());
-    g_plugin->m_eventData.top().m_EventData[tag] = std::move(data);
+    g_plugin->m_eventData.top().m_EventData[tag] = data;
 }
 
-bool Events::SignalEvent(const std::string& eventName, const API::Types::ObjectID target)
+bool Events::SignalEvent(const API::Types::ObjectID target)
 {
     bool skipped = false;
 
+    const std::string& eventName = g_plugin->m_eventData.top().m_EventName;
     const auto& scripts = g_plugin->m_eventMap[eventName];
 
     for (const auto& script : scripts)
@@ -193,7 +194,11 @@ Services::Events::ArgumentStack Events::OnSignalEvent(Services::Events::Argument
 {
     const auto event = Services::Events::ExtractArgument<std::string>(args);
     const auto object = Services::Events::ExtractArgument<API::Types::ObjectID>(args);
+
+    Events::StartEvent(event);
     bool proceed = SignalEvent(event, object);
+    Events::EndEvent(event);
+
     Services::Events::ArgumentStack stack;
     Services::Events::InsertArgument(stack, proceed ? 1 : 0);
     return stack;
