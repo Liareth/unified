@@ -51,11 +51,15 @@ void InitCrashHandlers()
     std::signal(SIGFPE,  nwnx_signal_handler);
     std::signal(SIGSEGV, nwnx_signal_handler);
 }
+
 void RestoreCrashHandlers()
 {
-    std::signal(SIGABRT, nwn_crash_handler);
-    std::signal(SIGFPE,  nwn_crash_handler);
-    std::signal(SIGSEGV, nwn_crash_handler);
+    if (nwn_crash_handler)
+    {
+        std::signal(SIGABRT, nwn_crash_handler);
+        std::signal(SIGFPE,  nwn_crash_handler);
+        std::signal(SIGSEGV, nwn_crash_handler);
+    }
 }
 
 static const char NWNX_PREFIX[]        = "NWNXEE!";
@@ -397,7 +401,16 @@ void NWNXCore::CreateServerHandler(API::CAppManager* app)
         }
     }
 
-    InitCrashHandlers();
+    if (g_core->m_coreServices->m_config->Get<bool>("USE_CRASH_HANDLERS", true))
+    {
+        InitCrashHandlers();
+    }
+    else
+    {
+        LOG_INFO("Skipping NWNX crash handlers due to configuration.");
+        nwn_crash_handler = nullptr;
+    }
+
     g_core->m_createServerHook.reset();
     app->CreateServer();
 }
