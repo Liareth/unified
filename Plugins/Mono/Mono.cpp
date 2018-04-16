@@ -1,5 +1,14 @@
 #include "Mono.hpp"
 #include "API/CNWVirtualMachineCommands.hpp"
+#include "API/CNWSArea.hpp"
+#include "API/CNWSAreaOfEffectObject.hpp"
+#include "API/CNWSCreature.hpp"
+#include "API/CNWSDoor.hpp"
+#include "API/CNWSEncounter.hpp"
+#include "API/CNWSModule.hpp"
+#include "API/CNWSPlaceable.hpp"
+#include "API/CNWSStore.hpp"
+#include "API/CNWSTrigger.hpp"
 #include "API/CVirtualMachine.hpp"
 #include "API/CVirtualMachineScript.hpp"
 #include "API/Functions.hpp"
@@ -169,6 +178,12 @@ Mono::Mono(const Plugin::CreateParams& params)
     Services::Resamplers::ResamplerFuncPtr resampler = &Services::Resamplers::template Sum<uint32_t>;
     GetServices()->m_metrics->SetResampler("Closure", resampler, std::chrono::seconds(1));
     GetServices()->m_metrics->SetResampler("MainLoop", resampler, std::chrono::seconds(1));
+
+    MonoMethod* apiInit = GetHandler("API", "Init", 0);
+    if (apiInit)
+    {
+        SetupCoreAPI(apiInit);
+    }
 }
 
 Mono::~Mono()
@@ -178,6 +193,121 @@ Mono::~Mono()
         mono_jit_cleanup(g_Domain);
         g_Domain = nullptr;
     }
+}
+
+template <typename T>
+void SetScripts(T* ptr, const char* fmtFriendly, const char* fmt, int max)
+{
+    char buff[17];
+
+    for (int i = 0; i < max; ++i)
+    {
+        sprintf(buff, "mono_%s_%i", fmt, i);
+        LOG_DEBUG("Setting %s script %i to %s.", fmtFriendly, i, buff);
+        ptr->m_sScripts[i] = CExoString(buff);
+    }
+}
+
+void Mono::SetupCoreAPI(MonoMethod* apiInit)
+{
+    ASSERT(apiInit);
+
+    MonoObject* ex = nullptr;
+    mono_runtime_invoke(apiInit, nullptr, nullptr, &ex);
+    if (ex)
+    {
+        char* exMsg = mono_string_to_utf8(mono_object_to_string(ex, nullptr));
+        LOG_FATAL("Caught unhandled exception when setting up the core API: '%s'", exMsg);
+        mono_free(exMsg);
+    }
+
+    // At this point we've determined that NWN.API.Init exists.
+    // This means that our user has declared that they wish to use the Core API.
+
+    // We need to hook all the entry points for setting event handlers.
+    // This will ensure that, unless manually overwritten via script, all event handlers
+    // will point to our API.
+
+    // AREA
+    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSArea__LoadAreaHeader, int32_t>(
+        +[](Services::Hooks::CallType type, CNWSArea* thisPtr, CResStruct*)
+        {
+            if (type != Services::Hooks::CallType::AFTER_ORIGINAL) return;
+            SetScripts(thisPtr, "area", "are", 4);
+        }
+    );
+
+    // AOE
+    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSAreaOfEffectObject__AddToArea, void>(
+        +[](Services::Hooks::CallType type, CNWSAreaOfEffectObject* thisPtr, CNWSArea*, float, float, float, int32_t)
+        {
+            if (type != Services::Hooks::CallType::AFTER_ORIGINAL) return;
+            SetScripts(thisPtr, "area of effect", "aoe", 4);
+        }
+    );
+
+    // CREATURE
+    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSCreature__AddToArea, void>(
+        +[](Services::Hooks::CallType type, CNWSCreature* thisPtr, CNWSArea*, float, float, float, int32_t)
+        {
+            if (type != Services::Hooks::CallType::AFTER_ORIGINAL) return;
+            SetScripts(thisPtr, "creature", "cre", 13);
+        }
+    );
+
+    // DOOR
+    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSDoor__AddToArea, void>(
+        +[](Services::Hooks::CallType type, CNWSDoor* thisPtr, CNWSArea*, float, float, float, int32_t)
+        {
+            if (type != Services::Hooks::CallType::AFTER_ORIGINAL) return;
+            SetScripts(thisPtr, "door", "dor", 15);
+        }
+    );
+
+    // ENCOUNTER
+    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSEncounter__AddToArea, void>(
+        +[](Services::Hooks::CallType type, CNWSEncounter* thisPtr, CNWSArea*, float, float, float, int32_t)
+        {
+            if (type != Services::Hooks::CallType::AFTER_ORIGINAL) return;
+            SetScripts(thisPtr, "encounter", "enc", 5);
+        }
+    );
+
+    // MODULE
+    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSModule__LoadModuleStart, int32_t>(
+        +[](Services::Hooks::CallType type, CNWSModule* thisPtr, CExoString, int32_t)
+        {
+            if (type != Services::Hooks::CallType::AFTER_ORIGINAL) return;
+            SetScripts(thisPtr, "module", "mod", 18);
+        }
+    );
+
+    // PLACEABLE
+    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSPlaceable__AddToArea, void>(
+        +[](Services::Hooks::CallType type, CNWSPlaceable* thisPtr, CNWSArea*, float, float, float, int32_t)
+        {
+            if (type != Services::Hooks::CallType::AFTER_ORIGINAL) return;
+            SetScripts(thisPtr, "placeable", "plc", 16);
+        }
+    );
+
+    // STORE
+    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSStore__AddToArea, void>(
+        +[](Services::Hooks::CallType type, CNWSStore* thisPtr, CNWSArea*, float, float, float, int32_t)
+        {
+            if (type != Services::Hooks::CallType::AFTER_ORIGINAL) return;
+            SetScripts(thisPtr, "store", "sto", 2);
+        }
+    );
+
+    // TRIGGER
+    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSTrigger__AddToArea, void>(
+        +[](Services::Hooks::CallType type, CNWSTrigger* thisPtr, CNWSArea*, float, float, float, int32_t)
+        {
+            if (type != Services::Hooks::CallType::AFTER_ORIGINAL) return;
+            SetScripts(thisPtr, "trigger", "trg", 7);
+        }
+    );
 }
 
 bool Mono::RunMonoScript(const char* scriptName, Types::ObjectID objId, bool valid)

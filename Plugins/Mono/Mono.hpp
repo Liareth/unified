@@ -27,6 +27,8 @@ private:
 
     std::unordered_map<std::string, MonoMethod*> m_ScriptMap;
 
+    void SetupCoreAPI(MonoMethod* apiInit);
+
     bool RunMonoScript(const char* scriptName,
         NWNXLib::API::Types::ObjectID objId = NWNXLib::API::Constants::OBJECT_INVALID,
         bool valid = true);
