@@ -104,7 +104,7 @@ void StackPushInteger(int32_t value)
     }
     else
     {
-        LOG_WARNING("Failed to push integer %s - recursion level %i.",
+        LOG_WARNING("Failed to push integer %i - recursion level %i.",
             value, GetVm()->m_nRecursionLevel);
     }
 }
