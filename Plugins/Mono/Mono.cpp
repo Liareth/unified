@@ -74,6 +74,12 @@ Mono::Mono(const Plugin::CreateParams& params)
     m_ExecuteClosure = GetHandler("Internal", "ExecuteClosure", 1);
     m_OnMainLoopTick = GetHandler("Events", "OnMainLoopTick", 1);
 
+    if (!m_PushScriptContext || !m_PopScriptContext || !m_ExecuteClosure || !m_OnMainLoopTick)
+    {
+        LOG_FATAL("Failed to resolve one or more internal Mono handlers. "
+            "Make sure you compiled your assembly and included all of the INTERNAL_*.cs files.");
+    }
+
     mono_add_internal_call("NWN.Internal::CallBuiltIn", reinterpret_cast<const void*>(&CallBuiltIn));
 
     mono_add_internal_call("NWN.Internal::StackPushInteger", reinterpret_cast<const void*>(&StackPushInteger));
@@ -320,21 +326,17 @@ MonoMethod* Mono::GetHandler(const char* clsName, const char* handler, int param
     ASSERT(image);
 
     MonoClass* cls = mono_class_from_name(image, "NWN", clsName);
-
-    if (!cls)
+    if (cls)
     {
-        LOG_FATAL("Failed to resolve NWN.%s", clsName);
+        MonoMethod* method = mono_class_get_method_from_name(cls, handler, paramCount);
+        if (method)
+        {
+            LOG_INFO("Resolved NWN.%s::%s.", clsName, handler);
+            return method;
+        }
     }
 
-    MonoMethod* method = mono_class_get_method_from_name(cls, handler, paramCount);
-
-    if (!method)
-    {
-        LOG_FATAL("Failed to resolve NWN.%s::%s", clsName, handler);
-    }
-
-    LOG_INFO("Resolved NWN.%s::%s.", clsName, handler);
-    return method;
+    return nullptr;
 }
 
 void Mono::ExecuteClosure(uint64_t eventId)
